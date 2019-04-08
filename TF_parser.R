@@ -8,6 +8,7 @@ sh(library(GenomicRanges))
 sh(library(WriteXLS))
 sh(library(tidyverse))
 sh(library(reticulate))
+sh(library(dplyr))
 
 args = commandArgs(trailingOnly=TRUE)
 gb_file = args[1]
@@ -15,14 +16,18 @@ gb_file = args[1]
 #This line has to be hardcoded to a python binary with pandas
 use_python('/Users/zkozi2/anaconda3/bin/python')
 
-
 message(str_c('Parsing ', gb_file))
 
 py_run_string(str_c('gb_file = ', "'", gb_file, "'"))
 
 py_run_file('record_parser.py')
 
-df <- py$result_df %>% mutate_at(c(4, 5, 7, 8), as.numeric)
+df <- py$result_df %>% 
+  mutate_at(c(4, 5, 7, 8), as.numeric) %>% 
+  mutate(`Genomic site start`=`Promoter start` + `Binding site start`,
+         `Genomic site end`=`Promoter start` + `Binding site end`) %>% 
+  distinct(Gene, Chr, `Transcription factor`, Score, Complement, `Genomic site start`, `Genomic site end`, .keep_all = TRUE) 
+
 
 message('Generating output')
 sites <- character()
@@ -37,10 +42,18 @@ for(g in unique(df$Gene)){
 
 df$Sites <- sites
 
-nsites <- sapply(unique(df$Gene), function(x)length(table(df[df$Gene == x, 11])))
+nsites <- sapply(unique(df$Gene), function(x)length(table(df[df$Gene == x, 13])))
 
-summary.df <- data.frame(Gene = names(nsites), 'No of sites' = nsites)
-df <- df %>% group_by(Gene) %>% arrange(Sites, .by_group = T)
+summary.df <- data.frame(Gene = names(nsites), 'No of sites' = nsites) %>% 
+  arrange(desc(No.of.sites))
+
+df <- df %>% 
+  group_by(Gene) %>% 
+  arrange(Sites, .by_group = T) %>% 
+  dplyr::select(Gene, Chr, Strand, `Transcription factor`, 
+                `Promoter start`, `Promoter end`, `Binding site start`, `Binding site end`, 
+                `Genomic site start`, `Genomic site end`, Complement, Score, Sites)
+                
 
 df.list <- list(Summary = summary.df, Results = df)
 
