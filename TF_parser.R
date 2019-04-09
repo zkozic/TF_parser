@@ -30,13 +30,12 @@ df <- py$result_df %>%
 
 
 message('Generating output')
-sites <- character()
+sites <- numeric()
 for(g in unique(df$Gene)){
   gdf <- df %>% filter(Gene == g)
   granges = GRanges(seqnames = Rle(gdf$Chr), IRanges(gdf$`Promoter start`+gdf$`Binding site start`, width = 5), strand = gdf$Strand)
   red.granges <- GenomicRanges::reduce(granges, with.revmap = T)
   hits <- findOverlaps(granges, red.granges) %>% subjectHits
-  hits <- str_c(g, '.', hits)
   sites <- c(sites, hits)
 }
 
@@ -50,6 +49,7 @@ summary.df <- data.frame(Gene = names(nsites), 'No of sites' = nsites) %>%
 df <- df %>% 
   group_by(Gene) %>% 
   arrange(Sites, .by_group = T) %>% 
+  mutate(Sites = str_c(Gene, Sites, sep=".")) %>% 
   dplyr::select(Gene, Chr, Strand, `Transcription factor`, 
                 `Promoter start`, `Promoter end`, `Binding site start`, `Binding site end`, 
                 `Genomic site start`, `Genomic site end`, Complement, Score, Sites)
